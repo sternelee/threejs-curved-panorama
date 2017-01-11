@@ -1,0 +1,187 @@
+<!DOCTYPE HTML>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8"/>
+    <title>旋转木马  请用手机观看</title>
+    <meta name="description" content=""/>
+    <meta name="viewport" content="width=device-width, target-densitydpi=device-dpi, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0"/>
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <style>
+        body, div, ul, li, img, p, a, h1, h2, h3 {
+            margin: 0px;
+            padding: 0px;
+            border: 0px;
+        }
+
+        html, body {
+            background: #ffffff;
+            color: #49494d;
+            font-family: "微软雅黑", "黑体", Helvetica, Verdana, sans-serif;
+            font-size: 14px;
+        }
+
+        body {
+            width: 100%;
+            height: 100%;
+        }
+
+        img{
+            display: block;
+            margin:0px auto;
+        }
+
+    </style>
+</head>
+<body>
+<video id="video" loop webkit-playsinline playsinline style="display:none">
+    <source src="textures/sintel.mp4" type='video/mp4; codecs="avc1.42E01E, mp4a.40.2"'>
+</video>
+<script src="three.min.js"></script>
+<script type="text/javascript" src="threex.domevent.js"></script>
+<script type="text/javascript">
+
+    var container;
+
+    var renderer, scene, camera, controls;
+    var ROTATE = false;
+    var WIDTH = window.innerWidth;
+    var HEIGHT = window.innerHeight;
+
+    var longitude = 0,
+        latitude = 0,
+        deepZ = 360,
+        deepX = 210;
+    var deepR = Math.sqrt(deepX*deepX + deepZ*deepZ);
+
+    var video, vCanvas, vImageContext, vTexture,vMaterial,vPlane,vMesh;
+
+    init();
+    animate();
+
+    function init(){
+
+        container = document.createElement( 'div' );
+        document.body.appendChild( container );
+
+        renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth,window.innerHeight);
+        renderer.setClearColor( 0xf0f0f0 );
+        container.appendChild(renderer.domElement);
+
+        camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 1, 5e3);
+        camera.position.set(-deepX, 0, deepZ);
+
+        scene = new THREE.Scene();
+
+        for(var i = 1; i < 21; i++){
+            var texture = THREE.ImageUtils.loadTexture('bg.png');
+            texture.minFilter = THREE.LinearFilter;
+            var plane = new THREE.PlaneGeometry(512, 819, 32);
+            var material = new THREE.MeshBasicMaterial({
+                map: texture,
+                overdraw: true
+            });
+            material.transparent = true;
+            material.opacity = 1;
+            material.side = THREE.DoubleSide;
+            var mesh = new THREE.Mesh(plane, material);
+            var pX = Math.sin(Math.PI*2/20*i)*Math.floor(40/Math.tan(Math.PI/20));
+            var pZ = -Math.cos(Math.PI*2/20*i)*Math.floor(40/Math.tan(Math.PI/20));
+            var rY = -i*2*Math.PI/20 - Math.PI/2;
+
+            mesh.position.set(pX,0,pZ);
+            mesh.rotation.y = rY;
+            scene.add(mesh);
+        }
+
+
+        // 视频图
+        video = document.getElementById( 'video' );
+        vCanvas = document.createElement( 'canvas' );
+        vCanvas.width = 480;
+        vCanvas.height = 204;
+
+        vImageContext = vCanvas.getContext( '2d' );
+        vImageContext.fillStyle = '#000000';
+        vImageContext.fillRect( 0, 0, 480, 204 );
+
+        vTexture = new THREE.Texture( vCanvas );
+        vTexture.minFilter = THREE.LinearFilter;
+        vMaterial = new THREE.MeshBasicMaterial( { map: vTexture, overdraw: 0.5 } );
+        vMaterial.side = THREE.DoubleSide;
+
+        vPlane = new THREE.PlaneBufferGeometry( 480, 204, 4, 4 );
+
+        vMesh = new THREE.Mesh( vPlane, vMaterial );
+        vMesh.position.set(-200,0,100);
+        vMesh.scale.x = vMesh.scale.y = 0.5;
+        scene.add(vMesh);
+
+        // 为mesh添加事件
+        domEvents   = new THREEx.DomEvents(camera, renderer.domElement);
+        domEvents.addEventListener(vMesh, 'touchstart', playVideo, false);
+
+        function playVideo(){
+            if(video.paused){
+                vMesh.scale.x = vMesh.scale.y = .6;
+                video.play();
+            }else{
+                video.pause();
+                vMesh.scale.x = vMesh.scale.y = 0.5;
+            }
+            
+        }
+
+    }
+
+        
+
+
+    function animate() {
+        requestAnimationFrame( animate );
+        camera.position.z = -deepR * Math.sin(longitude-Math.atan(deepZ/deepX));
+        camera.position.x = -deepR * Math.cos(longitude - Math.atan(deepZ/deepX));
+        camera.rotation.y = -longitude;
+        render();
+    }
+
+    var isMove = false, startX, startY, moveX, moveY;
+    document.addEventListener( 'touchstart', onKeyDown, false );
+    document.addEventListener( 'touchend', onKeyUp, false );
+    document.addEventListener( 'touchmove', onMove, false );
+
+    function onKeyDown(ev){
+        ev.preventDefault();
+        ev = ev.targetTouches[0];
+        isMove = true;
+        startX = ev.clientX;
+        startY = ev.clientY;
+    }
+
+    function onMove(ev){
+        ev.preventDefault();
+        ev = ev.targetTouches[0];
+        if(isMove){
+            longitude += Math.PI/1000 * (ev.clientX - startX) * 0.1;
+            latitude += (ev.clientY - startY) * 0.05;
+        }
+    }
+
+    function onKeyUp(ev){
+        ev.preventDefault();
+        isMove = false;
+    }
+
+
+    function render(){
+        if ( video.readyState === video.HAVE_ENOUGH_DATA ) {
+            vImageContext.drawImage( video, 0, 0 );
+            if ( vTexture ) vTexture.needsUpdate = true;
+        }
+        renderer.render(scene, camera);
+    }
+</script>
+</body>
+</html>
+
+
